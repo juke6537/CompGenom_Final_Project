@@ -1,0 +1,172 @@
+---
+title: "Final_Project"
+author: "Connor Gagen, Julia Keefe, Paloma Peters, Anna Mellizo Kroll"
+date: "2025-03-17"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+## Goal to analyze time course data
+I am looking at mouse MM10 with data where dox added to stem cell mouse then rna was collected in 3 replicates and sequenced
+
+RAW sequcncefiles are here: 
+File path/ 
+
+These fastqs were run through NF_CORE RNAS seq version X
+### Multiqc html is here: 
+file path/ 
+
+### Outpdir NF_CORE is here: 
+filepath/ 
+
+counts_matrix <- read.table("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/data/salmon.merged.gene_counts.tsv", header=TRUE, row.names=1)
+
+TPM <- read.table("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/data/salmon.merged.gene_tpm.tsv", header=TRUE, row.names=1)
+
+### Other output NF_CORE Testing is here
+
+# DESEQ
+output files / sav
+/results/sig_gene_df
+/results/final_gene_list
+
+## 1 IMPORTANT : CREATE Gene name to gene id conversion table.
+This will archive all genes in the starting analysis 
+## Note this would only change upon a different genome annotation as input into NF_CORE RNAseq pipeline
+```{r creating g2s file from counts matrix}
+
+# Note making data frame from index other files
+g2s <- data.frame(
+  gene_id = rownames(counts_matrix),
+  gene_name = counts_matrix[ , 1]
+)
+```
+# 2 Now that g2s is made let's clean up our counts matrix
+```{r removing gene_name column and rounding counts to integers}
+# remove gene_name column
+
+counts_matrix <- counts_matrix[,-1]
+#also
+counts_matrix <- counts_matrix %>%
+  select(-gene_name)
+
+
+
+# Round counts to integer mode required for DESEQ2
+counts_integer <- round(counts_matrix)
+
+```
+# Loading Deseq_sample_sheet
+```{r loading in sample sheet for DESEQ2}
+load("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/05_RNAseq_in_R_studio/results/deseq_samples.RData", verbose = T)
+view(deseq_samples)
+# oops that loaded a count matrix that isn't in integer -let's fix that
+counts_integer <- round(counts_matrix)
+
+```
+# 3) Factor Samples (just in case - double check if already factored)
+```{r}
+
+deseq_samples$time_point <- factor(deseq_samples$time_point)
+deseq_samples$replicate <- factor(deseq_samples$replicate)
+
+```
+# 4) Make sure rows and columns are ordered for analysis
+```{r checking that sample sheet and counts match rows and cols respectively}
+
+
+# Check ordering
+  stopifnot(all(colnames(counts_integer) == rownames(deseq_samples$sample_id)))
+
+# Nice our columns in the counts are the same as rows in sample_id
+
+```
+# 4) Run Deseq Model (time_point)
+```{r run DESEQ2}
+
+dds_time_point <- DESeqDataSetFromMatrix(countData = counts_integer,
+                              colData = deseq_samples,
+                              design = ~ time_point)
+
+dds_time_point <- DESeq(dds_time_point)
+
+```
+# 5 Compile all results 0-vs-12, 0-vs-24, 0-vs-48, 0-vs-96
+First we are going to make a datframe structure to store the results
+# Note this is a common strategy before a for-loop : make file to populate
+
+```{r viewing results and making a data frame to compile all results from each time}
+
+# Let's find the names of the results we want
+result_names <- resultsNames(dds_time_point)
+view(result_names)
+# Let's get rid of intercept
+results_names <- result_names[-1]
+view(results_names)
+# Now the empty data frame with values we want to grab from results
+
+res_df <- data.frame("gene_id" = character(), 
+                     "baseMean" = numeric(), 
+                     "log2FoldChange" = numeric(), 
+                     "lfcSE" = numeric(),
+                     "stat" = numeric(),
+                     "pvalue" = numeric(),
+                     "padj" = numeric(),
+                     "gene_name" = character(),
+                     "result_name" = character())
+
+```
+
+# creating a heat map to visualie sig gene expression
+* note we use row centering and not 0 normalization. 
+
+## load data for heatmap
+
+# load TPM RESULTS: 
+load("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/coga7041/MASTER_CLASS/lessons/06_Differential_expression_analyses/results/TPM_results/TPM_results.Rdata")
+
+# load DESEQ2 results
+load("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/coga7041/MASTER_CLASS/lessons/06_Differential_expression_analyses/results/counts_results_DESEQ/DESEQ_results.rdata")
+
+
+```
+
+# (1) Cluster samples
+First step is calculating distance between all samples. Let's start with our
+TPM data as these are the values typically used for clustering and heatmaps. 
+
+# Note use of transmute (t) 
+# Note log TPM values being used
+```{r distance calculation}
+
+# Log-transform the TPM values. 
+# This helps deflate spurious and low values - common practice for clustering/heatmaps
+log_tpm_matrix <- log2(TPM_filtered + 1)
+
+# Now let's calculate how closely related each sample (time point) is to each other using DIST function.
+# We make a vector the length of genes in TPM_filtered. Then use correlation (DIST function) to find similarity.
+# For other methods check out dist menu 
+?dist
+
+# Let's start with euclidean distance / similarity based on log2 TPM values of genes in TPM_filtered.
+distance_matrix <- dist(t(log_tpm_matrix), method = "euclidean")
+
+# Now we use the function : HCLUST ! 
+# This performs the hierarchical clustering of each samples relationship
+?hclust
+# Other forms of clustering as well see menu above for now ward or complete
+# Downside of ward is it assumes a circle relationship where as complete is linear - like we have with time.
+hc_complete <- hclust(distance_matrix, method = "complete")
+
+# Now we can use plot() to plot the distance calucalated in hclust!
+plot(hc_complete, labels = colnames(log_tpm_matrix), main = "Global TPM Filtered Dendrogram ", sub = "sample relationship by time and replicate after dox treatment")
+# Cool we see that samples see to return closer to 0 after 96 hours of dox treatment
+# Also that the replicates are more similar than time points - a very good / expected thing 
+
+# Cut tree to limit the clusters 
+clusters <- cutree(hc_complete, k = 5)
+# Print out which sample is in which cluster
+print(clusters)
+
+# Results: WT-
+```
