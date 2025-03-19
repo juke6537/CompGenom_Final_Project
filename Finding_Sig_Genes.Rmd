@@ -12,6 +12,7 @@ library(pheatmap)
 library(textshape)
 library(Rcpp)
 library(DESeq2)
+library(knitr)
 ```
 
 # Goal: script our RNAseq analysis pipeline to find genes changing significant across time from dox exposure. 
@@ -110,8 +111,8 @@ filtered_res_df <- res_df %>%
 unique_sig_genes <- unique(filtered_res_df$gene_id)
 ```
 # Testing knitting with a plot
-```{R changing shapes in plot}
              
-
+```{r include_image, echo=FALSE, fig.cap="Testing Graph from Fiji"}
+include_graphics("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/Figures/TestingGraph.png")
 
 ```
