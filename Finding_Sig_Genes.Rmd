@@ -1,3 +1,12 @@
+---
+title: "Finding_Sig_Genes"
+author: "Connor Gagen, Julia Keefe, Paloma Peters, Anna Mellizo Kroll"
+date: "2025-03-19"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(IRanges)
@@ -109,10 +118,4 @@ filtered_res_df <- res_df %>%
   filter(padj < 0.05, abs(log2FoldChange) > 1)
 
 unique_sig_genes <- unique(filtered_res_df$gene_id)
-```
-# Testing knitting with a plot
-             
-```{r include_image, echo=FALSE, fig.cap="Testing Graph from Fiji"}
-include_graphics("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/Figures/TestingGraph.png")
-
 ```
