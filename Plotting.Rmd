@@ -1,0 +1,163 @@
+---
+title: "Plotting"
+author: "Connor Gagen, Julia Keefe, Paloma Peters, Anna Mellizo Kroll, Anna Broerman"
+date: "2025-03-19"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#install.packages("reshape")
+library(reshape)
+library(tidyr)
+library(tibble)
+library(ggplot2)
+library(dplyr)
+
+```
+
+```{r loading in DESeq and TPM results}
+load("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/project_results/counts_DESEQ_results.rdata")
+
+load("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/project_results/TPM_results.Rdata")
+```
+
+```{r facet all timepoint TPM distributions}
+# First let's make set of time values for faceting:
+time_values <- c("0_avg", "12_avg", "24_avg", "48_avg", "96_avg")
+
+# This can also be done with grep (smarter):
+time_points <- names(average_and_stddev_values)[grep("avg", names(average_and_stddev_values))]
+# moving rows into df so we can track gene_id
+average_and_stddev_values_2 <- rownames_to_column(average_and_stddev_values, var = "gene_id")
+
+# Melt the data frame to long format
+melt_tpm_df <- melt(average_and_stddev_values_2, measure.vars = time_points, value_name = "gene_id")
+
+# Cool we just made it a really long df (compare original and melt) -it's 5x longer
+# Note the same can be done with pivot longer
+pivot_longer_tpm_df <- average_and_stddev_values_2 %>% 
+  pivot_longer(cols = all_of(time_points), names_to = 'Time', values_to = 'TPM')
+
+```
+
+```{r TPM for DESEQ2 sig genes}
+sig_genes <- as.data.frame(unique(filtered_res_df$gene_id))
+
+names(sig_genes) <- "gene_id"
+
+# one way to subset the data frame of avrg / sd TPM values
+sig_gene_tpm <- inner_join(average_and_stddev_values_2, sig_genes, by = "gene_id")
+
+
+# let's now merge in the gene names into this handy dataframe
+sig_gene_tpm <- merge(sig_gene_tpm, g2s)
+
+# Now we should organize so we can plot specific genes (not mix character and integer)
+sig_gene_tpm <- sig_gene_tpm %>%
+  select(-gene_id) 
+```
+
+```{r Finding top 5 significant genes}
+sig_gene_tpm$change <- abs(sig_gene_tpm[[3]] - sig_gene_tpm[[1]])
+
+# Order the data frame by the 4th and 2nd columns in ascending order (smallest values first)
+sorted_df <- sig_gene_tpm[order(sig_gene_tpm[[4]], sig_gene_tpm[[2]]), ]
+
+# Get indices of the top 5 maximum changes in the 1st and 3rd column difference
+top_indices <- order(sorted_df$change, decreasing = TRUE)[1:5]
+
+# Retrieve the top 5 values with the gene name (11th column), change, 4th column, and 2nd column
+top_genes <- sorted_df[top_indices, c(11, which(colnames(sorted_df) == "change"), 4, 2)]
+```
+#ENSMUSG00000064357.1 is mt-Atp6
+#ENSMUSG00000000031.16 is H19
+#ENSMUSG00000050621.7 is Rps27rt
+
+# (1) set of genes of interest or list.
+genes_of_interest <- data.frame(gene = c("ENSMUSG00000064357.1", "ENSMUSG00000000031.16", "ENSMUSG00000050621.7"))
+
+# (2) Reduce TPM file to these genes
+df_plot_genes <- TPM_filtered[rownames(TPM_filtered) %in% genes_of_interest$gene, ]
+
+# Moving rownames in to a column
+df_plot_genes <- rownames_to_column(df_plot_genes, var = "gene_id")
+
+# (3) Pivot longer (watch the changes !)
+df_plot_genes <- df_plot_genes %>% 
+  pivot_longer(cols = -gene_id, names_to = 'Time_Replicate', values_to = 'TPM')
+
+# Seperating sample name into time and replicate for plotting table
+df_plot_genes <- df_plot_genes %>%
+  separate(
+    Time_Replicate,
+    into = c('WT', 'Time', 'Replicate'),
+    sep = '_',
+    extra = "merge"
+  ) %>%
+  select(-WT)
+
+# Convert Time to numeric values
+df_plot_genes$Time <- as.numeric(df_plot_genes$Time)
+
+# (4) Group by Time and calculate mean and std of TPM
+df_plot_genes <- df_plot_genes %>% 
+  group_by(gene_id, Time) %>% 
+  summarise(mean_TPM = mean(TPM), sd_TPM = sd(TPM))
+
+# (5) Plot the line plot with error bars
+ggplot(df_plot_genes, aes(x = Time, y = mean_TPM)) +
+  geom_line() +
+  geom_errorbar(aes(ymin = mean_TPM - sd_TPM, ymax = mean_TPM + sd_TPM), width = 0.2) +
+  labs(x = 'Time (hours)', y = 'Average TPM') +
+  ggtitle('Average TPM across Time Points') +
+  facet_wrap(~ gene_id, scales = "free_y")
+
+
+
+
+
+
+#Plotting one specific gene: 
+
+# Picking a favorite gene
+gene_up <- as.data.frame(c("Rps27rt"))
+
+names(gene_up) <- "gene_name"
+
+# indexing to just get values for this gene
+Rps27rt_tpm <- sig_gene_tpm[sig_gene_tpm$gene_name %in% gene_up$gene_name, ]
+
+# now moving the character gene_name to rownames to won't interfere with numeric values
+rownames(Rps27rt_tpm) <- Rps27rt_tpm$gene_name
+
+# removing text column
+Rps27rt_tpm <- Rps27rt_tpm %>%
+  select(-gene_name) 
+# We now need to futher prepare our data :)
+# Let's get a variable for col names to plot
+avg_cols <- grep("_avg", names(Rps27rt_tpm), value = TRUE)
+
+sd_cols <- grep("_sd", names(Rps27rt_tpm), value = TRUE)
+
+# This is another way to "melt" or pivot longer
+plot_df <- data.frame(
+  time = as.numeric(gsub("_avg", "", avg_cols)),
+  avg = unlist(Rps27rt_tpm[avg_cols]),
+  sd = unlist(Rps27rt_tpm[sd_cols])
+)
+
+# NOW THE PLOT !
+ggplot(plot_df, aes(x = time, y = avg)) +
+  geom_line() +
+  geom_errorbar(aes(ymin = avg - sd, ymax = avg + sd), width = 0.2) +
+  theme("paperwhite") +
+  labs(x = "Time (hours)", y = "TPM Value") +
+  ggtitle('Gene Rps27rt')
+  
+  
+  
+  
+  

@@ -1,11 +1,29 @@
 ---
 title: "Figures"
-author: "Connor Gagen, Julia Keefe, Paloma Peters, Anna Mellizo Kroll"
+author: "Connor Gagen, Julia Keefe, Paloma Peters, Anna Mellizo Kroll, Anna Broerman"
 date: "2025-03-19"
 output: html_document
 editor_options: 
   chunk_output_type: console
 ---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(IRanges)
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(readr)
+library(ggplot2)
+library(purrr)
+library(magrittr)
+library(pheatmap)
+library(textshape)
+library(Rcpp)
+library(DESeq2)
+library(matrixStats)
+library(knitr)
+```
 
 ```{r loading in DESeq and TPM results}
 load("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/project_results/counts_DESEQ_results.rdata")

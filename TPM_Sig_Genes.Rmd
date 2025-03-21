@@ -1,6 +1,6 @@
 ---
 title: "TPM_Sig_Genes"
-author: "Connor Gagen, Julia Keefe, Paloma Peters, Anna Mellizo Kroll"
+author: "Connor Gagen, Julia Keefe, Paloma Peters, Anna Mellizo Kroll, Anna Broerman"
 date: "2025-03-19"
 output: html_document
 editor_options: 
@@ -22,6 +22,7 @@ library(textshape)
 library(Rcpp)
 library(DESeq2)
 library(matrixStats)
+library(knitr)
 ```
 
 # Import TPM file from Salmon
