@@ -26,66 +26,66 @@ library(knitr)
 
 # Goal: script our RNAseq analysis pipeline to find genes changing significant across time from dox exposure. 
 
-# Importing counts values
+## Importing counts values
 ```{r import counts from Salmon}
-# laoding Salmon counts from NF_CORE run 3.14
+# This loads in the counts from the NF core run
 counts_matrix <- read.table("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/data/salmon.merged.gene_counts.tsv", header=TRUE, row.names=1)
 
-# preparing counts for DESEQ
-# create g2s
+# This will prepare the counts for DESEQ by creating g2s
 g2s <- data.frame(
   gene_id = rownames(counts_matrix),
   gene_name = counts_matrix[, 1]
 )
-# removing gene_name column for analyses
+# This removes the gene name from the counts matrix such that it is only numeric values
 counts_matrix <- counts_matrix[ , -1]
-# Round counts to integer mode required for DESEQ2
+# Round the values within the counts matrix. 
 counts_integer <- round(counts_matrix)
 
 ```
 
-# Creating sample sheet for deseq from counts file
+## Creating sample sheet for deseq from counts file
 ```{r creating deseq sample sheet}
-# setting up data frame with cols from counts matrix
+# This creates the data frame with the same columns as the counts_matrix
 deseq_samples <- data.frame(
   sample_id = colnames(counts_matrix))
-# creating time point and replicate cols from col names
-# Split names
+# Splits the sample_id to create a columns for time point and replicate columns
 split_values <- strsplit(deseq_samples$sample_id, "_")
-# grabbing time point and replicate info 
+# This extracts the time point and the replicate info
 time_values <- sapply(split_values, function(x) x[[2]])
 replicate_values <- sapply(split_values, function(x) x[[3]])
-# placing time point and replicate info into data frame
+# This will place the time point and replicate into the data frame.
 deseq_samples$time_point <- time_values
 deseq_samples$replicate <- replicate_values
-# Factor time point and replicate
+# This converts the time point and replicate data into a factor.
 deseq_samples$time_point <- factor(deseq_samples$time_point)
 deseq_samples$replicate <- factor(deseq_samples$replicate)
 
 ```
 
-# Running DESEQ2
+## Running DESEQ2
 ```{r running deseq2}
-# testing sample sheet and counts are arranged properly 
+# Test to see if the sample sheet matches the corresponding deseq_samples data frame
 stopifnot(all(colnames(counts_integer) == rownames(deseq_samples$sample_id)))
 
-# setting up dds
+# Sets up the dds
 dds_time_point <- DESeqDataSetFromMatrix(countData = counts_integer,
                               colData = deseq_samples,
                               design = ~ time_point)
-# Run time point model
+# Runs the DESeqq
 dds_time_point <- DESeq(dds_time_point)
 
 ```
 
-# Extracting results for each time point from DESEQ dds
+## Extracting results for each time point from DESEQ dds
 ```{r compile DESEQ2 results}
 
-# setting up result names object for input to forloop
+# setting up result names object for input to for loop
+# retrieves the names corresponding to the different time points 
 result_names <- resultsNames(dds_time_point)
+# Removes the first entry from deseq which is the baseline. 
 results_names <- result_names[-1]
 
-# Setting up dataframe
+# Setting up data frame 
 res_df <- data.frame("gene_id" = character(), 
                      "baseMean" = numeric(), 
                      "log2FoldChange" = numeric(), 
@@ -111,7 +111,7 @@ for(i in 1:length(results_names)) {
 
 ```
 
-# Filtering to significant results P <0.05 and LFC abs(1)
+##  Filtering to significant results P <0.05 and LFC abs(1)
 ```{r filtering DESEQ results to LFC > abs(1)& P <0.05}
 
 filtered_res_df <- res_df %>%

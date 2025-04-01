@@ -76,6 +76,8 @@ top_genes <- sorted_df[top_indices, c(11, which(colnames(sorted_df) == "change")
 #ENSMUSG00000000031.16 is H19
 #ENSMUSG00000050621.7 is Rps27rt
 
+#Plotting all three gene line plots together: 
+```{r plotting}
 # (1) set of genes of interest or list.
 genes_of_interest <- data.frame(gene = c("ENSMUSG00000064357.1", "ENSMUSG00000000031.16", "ENSMUSG00000050621.7"))
 
@@ -107,21 +109,25 @@ df_plot_genes <- df_plot_genes %>%
   group_by(gene_id, Time) %>% 
   summarise(mean_TPM = mean(TPM), sd_TPM = sd(TPM))
 
-# (5) Plot the line plot with error bars
+# (1) Create a named vector for gene ID to gene name mapping
+gene_labels <- c(
+  "ENSMUSG00000064357.1" = "mt-Atp6",
+  "ENSMUSG00000000031.16" = "H19",
+  "ENSMUSG00000050621.7" = "Rps27rt"
+)
+
+# (2) Modify the plot to use these names in facet_wrap
 ggplot(df_plot_genes, aes(x = Time, y = mean_TPM)) +
   geom_line() +
   geom_errorbar(aes(ymin = mean_TPM - sd_TPM, ymax = mean_TPM + sd_TPM), width = 0.2) +
   labs(x = 'Time (hours)', y = 'Average TPM') +
-  ggtitle('Average TPM across Time Points') +
-  facet_wrap(~ gene_id, scales = "free_y")
+  ggtitle('Average TPM Across All Time Points') +
+  facet_wrap(~ gene_id, scales = "free_y", labeller = labeller(gene_id = gene_labels))
 
+```
 
-
-
-
-
-#Plotting one specific gene: 
-
+#Plotting gene Rps27rt as a line plot:  
+```{r plotting}
 # Picking a favorite gene
 gene_up <- as.data.frame(c("Rps27rt"))
 
@@ -155,9 +161,104 @@ ggplot(plot_df, aes(x = time, y = avg)) +
   geom_errorbar(aes(ymin = avg - sd, ymax = avg + sd), width = 0.2) +
   theme("paperwhite") +
   labs(x = "Time (hours)", y = "TPM Value") +
-  ggtitle('Gene Rps27rt')
+  ggtitle('Gene Rps27rt Across Time')
+```  
+  
+
+#Plotting gene mt-Atp6 as a line plot:  
+```{r plotting}
+# Picking a favorite gene
+gene_up <- as.data.frame(c("mt-Atp6"))
+
+names(gene_up) <- "gene_name"
+
+# indexing to just get values for this gene
+mtAtp6_tpm <- sig_gene_tpm[sig_gene_tpm$gene_name %in% gene_up$gene_name, ]
+
+# now moving the character gene_name to rownames to won't interfere with numeric values
+rownames(mtAtp6_tpm) <- mtAtp6_tpm$gene_name
+
+# removing text column
+mtAtp6_tpm <- mtAtp6_tpm %>%
+  select(-gene_name) 
+# We now need to futher prepare our data :)
+# Let's get a variable for col names to plot
+avg_cols <- grep("_avg", names(mtAtp6_tpm), value = TRUE)
+
+sd_cols <- grep("_sd", names(mtAtp6_tpm), value = TRUE)
+
+# This is another way to "melt" or pivot longer
+plot_df <- data.frame(
+  time = as.numeric(gsub("_avg", "", avg_cols)),
+  avg = unlist(mtAtp6_tpm[avg_cols]),
+  sd = unlist(mtAtp6_tpm[sd_cols])
+)
+
+# NOW THE PLOT !
+ggplot(plot_df, aes(x = time, y = avg)) +
+  geom_line() +
+  geom_errorbar(aes(ymin = avg - sd, ymax = avg + sd), width = 0.2) +
+  theme("paperwhite") +
+  labs(x = "Time (hours)", y = "TPM Value") +
+  ggtitle('Gene mt-Atp6 Across Time')
+```  
   
   
+#Plotting gene H19 as a line plot:  
+```{r plotting}
+# Picking a favorite gene
+gene_up <- as.data.frame(c("H19"))
+
+names(gene_up) <- "gene_name"
+
+# indexing to just get values for this gene
+H19_tpm <- sig_gene_tpm[sig_gene_tpm$gene_name %in% gene_up$gene_name, ]
+
+# now moving the character gene_name to rownames to won't interfere with numeric values
+rownames(H19_tpm) <- H19_tpm$gene_name
+
+# removing text column
+H19_tpm <- H19_tpm %>%
+  select(-gene_name) 
+# We now need to futher prepare our data :)
+# Let's get a variable for col names to plot
+avg_cols <- grep("_avg", names(H19_tpm), value = TRUE)
+
+sd_cols <- grep("_sd", names(H19_tpm), value = TRUE)
+
+# This is another way to "melt" or pivot longer
+plot_df <- data.frame(
+  time = as.numeric(gsub("_avg", "", avg_cols)),
+  avg = unlist(H19_tpm[avg_cols]),
+  sd = unlist(H19_tpm[sd_cols])
+)
+
+# NOW THE PLOT !
+ggplot(plot_df, aes(x = time, y = avg)) +
+  geom_line() +
+  geom_errorbar(aes(ymin = avg - sd, ymax = avg + sd), width = 0.2) +
+  theme("paperwhite") +
+  labs(x = "Time (hours)", y = "TPM Value") +
+  ggtitle('Gene H19 Across Time')
   
+```
+#Volcano plot 
+
+?ggplot
+```{r volcano plot}
+highlighted_genes <- c("H19", "Rps27rt", "mtAtp6")
+
+# Create a new column for coloring, using the gene column 
+filtered_res_df$color_group <- ifelse(filtered_res_df[[8]] %in% highlighted_genes, "Genes of Interest", "Other")
+
+# Plot
+ggplot(filtered_res_df, aes(x = log2FoldChange, y = -log10(padj), color = color_group)) +
+  geom_point(alpha = 0.5) +  # Adjust transparency for clarity
+  xlim(-5, 5) +
+  ylim(0, 65) +
+  scale_color_manual(values = c("Genes of Interest" = "red", "Other" = "black")) +  # Set colors
+  labs(x = "Log2 Fold Change", y = "-log10(Adjusted P-value)", title = "Volcano Plot of Significant Genes") +
+  theme_minimal()
+```
   
   

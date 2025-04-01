@@ -37,6 +37,8 @@ Gm13694 *max
 
 H19 *another gene that could be good*
 
+
+
 # creating a heat map to visualize sig gene expression
 * note we use row centering and not 0 normalization. 
 
