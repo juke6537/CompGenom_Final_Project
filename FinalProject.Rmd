@@ -1,88 +1,124 @@
 ---
-title: "Final_Project"
+title: "Final Project: Using DESeq to Analyze the Affect of Doxycycline on the Mouse Genes mt-Atp6, H19, and Rps27rt Over Time"
 author: "Connor Gagen, Julia Keefe, Paloma Peters, Anna Mellizo Kroll, Anna Broerman"
-date: "2025-03-17"
+date: "2025-04-04"
 output: html_document
 editor_options: 
   chunk_output_type: console
 ---
-## Goal to analyze time course data
-I am looking at mouse MM10 with data where dox added to stem cell mouse then RNA was collected in 3 replicates and sequenced
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(IRanges)
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(readr)
+library(ggplot2)
+library(purrr)
+library(magrittr)
+library(pheatmap)
+library(textshape)
+library(Rcpp)
+library(DESeq2)
+library(matrixStats)
+library(knitr)
+```
 
-RAW sequecncefiles are here: 
-File path/ 
+## Goal: to analyze time course data
+We are looking at mouse MM10 with data where dox added to stem cell mouse then RNA was collected in 3 replicates we chose to study the genes that had the largest and most significant changes over time.
 
-These fastqs were run through NF_CORE RNAS seq version X
-### Multiqc html is here: 
-file path/ 
+This resulted in three significant genes to study further:
 
-### Outpdir NF_CORE is here: 
-filepath/ 
+mt-Atp6: a mitochondrial gene located at chrM:8527–9207 that encodes a subunit of ATP synthase, essential for cellular energy production. It forms part of the proton channel in Complex V, helping convert the mitochondrial proton gradient into ATP. Mutations in this gene are linked to disorders like Leigh syndrome and NARP.
 
-counts_matrix <- read.table("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/data/salmon.merged.gene_counts.tsv", header=TRUE, row.names=1)
+H19: an imprinted, maternally expressed long non-coding RNA (lncRNA) located near the IGF2 gene on chromosome 11. It plays a role in growth regulation and has been implicated in various cancers. Mutations in H19 are associated with Beckwith-Wiedemann Syndrome and Wilms tumorigenesis. Alternative splicing of this gene results in multiple transcript variants.
 
-TPM <- read.table("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/data/salmon.merged.gene_tpm.tsv", header=TRUE, row.names=1)
+Rps27rt: a likely ribosomal protein coding gene. It is a short, 340-base pair segment. This region does not encompass any known genes or well-characterized functional elements. It may contain non-coding sequences, regulatory elements, or regions of unknown function.
 
-### Other output NF_CORE Testing is here
+## First, we focused on finding significant genes as seen in: Finding_Sig_Genes.Rmd
+This involved using RNASeq analysis pipeline to find genes changing significant across time from dox exposure.
 
-# DESEQ was run with the following unique_sig_genes, counts_integer, g2s, res_df, filtered_res_df, and deseq_samples results:
-load("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/project_results/counts_DESEQ_results.rdata")
+The results showed the following significant genes:
 
-# TPM, average_and_stddev_values, TPM_filtered results:
-load("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/project_results/TPM_results.Rdata")
-
-# We decided to look at the top 5 genes with the largest log2fold change and smallest standard deviation to see how they differentiate:
-Gm45234 *min
-Gm13694 *max
-
-H19 *another gene that could be good*
-
-
-
-# creating a heat map to visualize sig gene expression
-* note we use row centering and not 0 normalization. 
-
-## load data for heatmap
-
+```{r sig genes image, echo=FALSE, fig.cap="List of Significant Genes"}
+include_graphics("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/Figures/genes.png")
 
 ```
 
-# (1) Cluster samples
-First step is calculating distance between all samples. Let's start with our
-TPM data as these are the values typically used for clustering and heatmaps. 
+### DESEQ testing results as seen in: Finding_Sig_Genes.Rmd
+##### DESEQ was run with the following unique_sig_genes, counts_integer, g2s, res_df, and deseq_samples results:
+load(“/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/project_results/counts_DESEQ_results.rdata”)
 
-# Note use of transmute (t) 
-# Note log TPM values being used
-```{r distance calculation}
+## Next, TPM was run on the significant genes as seen in: TPM_Sig_Genes.Rmd
+This involved filtering the TPM, assigning time points and replicates, and determining the average and standard deviation values.
+TPM_filtered results:
+load(“/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/project_results/TPM_results.Rdata”)
 
-# Log-transform the TPM values. 
-# This helps deflate spurious and low values - common practice for clustering/heatmaps
-log_tpm_matrix <- log2(TPM_filtered + 1)
+### Then, we determined 5 genes had the largest change in TPM from 0-12hrs and smallest standard deviation as seen in: Plotting.Rmd
 
-# Now let's calculate how closely related each sample (time point) is to each other using DIST function.
-# We make a vector the length of genes in TPM_filtered. Then use correlation (DIST function) to find similarity.
-# For other methods check out dist menu 
-?dist
+```{r top 5 genes image, echo=FALSE, fig.cap="Top 5 Significant Genes"}
+include_graphics("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/Figures/top_5_genes.png")
 
-# Let's start with euclidean distance / similarity based on log2 TPM values of genes in TPM_filtered.
-distance_matrix <- dist(t(log_tpm_matrix), method = "euclidean")
-
-# Now we use the function : HCLUST ! 
-# This performs the hierarchical clustering of each samples relationship
-?hclust
-# Other forms of clustering as well see menu above for now ward or complete
-# Downside of ward is it assumes a circle relationship where as complete is linear - like we have with time.
-hc_complete <- hclust(distance_matrix, method = "complete")
-
-# Now we can use plot() to plot the distance calucalated in hclust!
-plot(hc_complete, labels = colnames(log_tpm_matrix), main = "Global TPM Filtered Dendrogram ", sub = "sample relationship by time and replicate after dox treatment")
-# Cool we see that samples see to return closer to 0 after 96 hours of dox treatment
-# Also that the replicates are more similar than time points - a very good / expected thing 
-
-# Cut tree to limit the clusters 
-clusters <- cutree(hc_complete, k = 5)
-# Print out which sample is in which cluster
-print(clusters)
-
-# Results: WT-
 ```
+
+### From here, we decided to look at 3 genes: mt-Atp6, H19, and Rps27rt
+
+mt-Atp6 and Rps27rt were chosen because they were the functional genes that had the largest change in gene regulation from zero to 12 hours and the smallest standard deviation at zero and 12 hours. Pseudogenes, starting with Gm, were ignored because they are nonfunctional of DNA that resembles genes. H19 was chosen as a gene of interest because of its unique interaction with doxycycline. Initially, this gene is down-regulated, then it is upregulated at longer times.
+
+```{r volcano image, echo=FALSE, fig.cap="Volcano Plot of Significant Genes"}
+include_graphics("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/Figures/Volcano.png")
+
+```
+The purpose of this volcano plot is to show how gene expression changes after the addition of doxycycline. The x-axis shows genes that were either up-regulated or down-regulated past a certain threshold. The y-axis represents the statistical significance of each gene, the higher, the more significant. As shown, the genes of interest are mt-Atp6, H19, Rps27rt. These are highlighted in red. Generally, mt-Atp6 and Rps27rt are more statistically significant and demonstrate a larger change in gene up-regulation than most other genes. H19 is also a gene of interest due to its unique interaction with doxycycline.
+
+### We also visualized the genomic changes for mt-Atp6, Rps27rt, and H19 using IGV
+```{r mt-Atp6_IGV image, echo=FALSE, fig.cap="mt-Atp6 In IGV"}
+include_graphics("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/Figures/Atp6.png")
+
+```
+
+```{r Rps27rt_IGV image, echo=FALSE, fig.cap="Rps27rt In IGV"}
+include_graphics("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/Figures/Rps27rt.png")
+
+```
+
+```{r H19_IGV image, echo=FALSE, fig.cap="H19 In IGV"}
+include_graphics("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/Figures/H19.png")
+
+```
+Visualization using IgViz agrees with our previous results by showing that the expression of mt-Atp6 and Rps27rt changes between 0 and 12 hours whereas H19 does not change significantly until hours 48 and 96.
+
+## To analyze these three genes, we plotted as seen in: Plotting.Rmd
+
+The results were:
+
+```{r mt-Atp6 image, echo=FALSE, fig.cap="Line Plot of mt-Atp6 TPM Data"}
+include_graphics("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/Figures/mt-Atp6_TPM.png")
+
+```
+This plot shows the transcripts per million (TPM) for gene mt-Atp6 over time. As shown, the largest instance of up-regulation occurs between 0-12 hours. The TPM increases from 3000 to 6000. TPM continues to increase until approximately 48 hours where it then begins to drop back toward its original value.
+
+```{r Rps27rt image, echo=FALSE, fig.cap="Line Plot of Rps27rt TPM Data"}
+include_graphics("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/Figures/RPs27rt_TPM.png")
+
+```
+This plot graphs the change in transcripts per million (TPM) of the Rps27rt gene over a 96 hour time period. The TPM increases drastically between hours 0 and 12, showing over a 3 fold change. It continues to steadily increase until 48 hours, where the TPM begins to drop until 96 hours, where TPM expression is below baseline.
+
+The  above data indicates that both genes Rps27rt and mt-Atp6 are strongly induced following doxycycline administration. There is a strong early response with sustained activation until 48 hours; this could be linked to doxycycline's mechanism of action or downstream effects. The decline in expression following 48 hours suggests some form of negative feedback regulation, a depletion of responsive factors, or cellular adaptation to doxycycline exposure. However, this is assuming that the effects of doxycycline are indirect. If there is a direct relationship between doxycycline and the these genes, then it is likely that the TPM decreases as doxycycline is metabolized through the body, as the half life of doxycycline is about 16-22 hours.
+
+```{r H19 image, echo=FALSE, fig.cap="Line Plot of H19 TPM Data"}
+include_graphics("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/Figures/H19_TPM.png")
+
+```
+This plot shows the transcripts per million (TPM) for gene H19 over time. In contrast, H19 was chosen as a gene of interest because of its unique interaction with doxycycline. Initially, this gene is down-regulated, then it is upregulated at longer times as shown in the line plot above. 
+
+```{r heatmap image, echo=FALSE, fig.cap="Heatmap of mt-Atp6, Rps27rt, and H19"}
+include_graphics("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/Figures/heatmap.png")
+
+```
+The purpose of the heatmap is to visualize the log2-Transformed TPM (Transcripts Per Million) for the three chosen genes (mt-Atp6, Rps27rt, and H19) over time during doxycycline (dox) treatment. From the heatmap it is evident that H19 (top row) is initially downregulated and then reaches a maximum at 48 hours and remains elevated to 96 hours. Rps27rt and mt-Atp6 have the largest change from zero to 12 hours, confirming our gene selection.
+
+## Conclusion
+To sum up, we utilized DESeq and TPM analyses to identify genes of interest affected by doxycycline in mice. Through this process we chose three genes, H16, mt-Atp6, and Rps27rt to further investigate. Mt-Atp6 and Rps27rt were chosen because they had the largest change from 0 to 12 hours and H19 was chosen due to its unique interactions with doxycycline. We visualized these genes through a volcano plot, individual plots of TPM overtime for each gene, a heat map, and IgViz. These enabled us to conclude that mt-Atp6 and Rps27rt are upregulated from 0 to 12 hours and H19 is upregulated during hours 48 and 96. 
+
+To view the full code for each part of our analysis, see: Finding_Sig_Genes.Rmd, TPM_Sig_Genes.Rmd, and Plotting.Rmd

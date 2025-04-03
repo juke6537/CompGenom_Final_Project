@@ -1,7 +1,7 @@
 ---
 title: "Finding_Sig_Genes"
 author: "Connor Gagen, Julia Keefe, Paloma Peters, Anna Mellizo Kroll, Anna Broerman"
-date: "2025-03-19"
+date: "2025-04-04"
 output: html_document
 editor_options: 
   chunk_output_type: console
@@ -24,7 +24,7 @@ library(DESeq2)
 library(knitr)
 ```
 
-# Goal: script our RNAseq analysis pipeline to find genes changing significant across time from dox exposure. 
+# Goal: script our RNAseq analysis pipeline to find genes changing significantly across time from dox exposure. 
 
 ## Importing counts values
 ```{r import counts from Salmon}
@@ -43,8 +43,8 @@ counts_integer <- round(counts_matrix)
 
 ```
 
-## Creating sample sheet for deseq from counts file
-```{r creating deseq sample sheet}
+## Creating sample sheet for DESeq from counts file
+```{r creating DESeq sample sheet}
 # This creates the data frame with the same columns as the counts_matrix
 deseq_samples <- data.frame(
   sample_id = colnames(counts_matrix))
@@ -66,20 +66,17 @@ deseq_samples$replicate <- factor(deseq_samples$replicate)
 ```{r running deseq2}
 # Test to see if the sample sheet matches the corresponding deseq_samples data frame
 stopifnot(all(colnames(counts_integer) == rownames(deseq_samples$sample_id)))
-
 # Sets up the dds
 dds_time_point <- DESeqDataSetFromMatrix(countData = counts_integer,
                               colData = deseq_samples,
                               design = ~ time_point)
 # Runs the DESeqq
 dds_time_point <- DESeq(dds_time_point)
-
 ```
 
 ## Extracting results for each time point from DESEQ dds
 ```{r compile DESEQ2 results}
 
-# setting up result names object for input to for loop
 # retrieves the names corresponding to the different time points 
 result_names <- resultsNames(dds_time_point)
 # Removes the first entry from deseq which is the baseline. 

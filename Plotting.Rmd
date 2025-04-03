@@ -1,7 +1,7 @@
 ---
 title: "Plotting"
 author: "Connor Gagen, Julia Keefe, Paloma Peters, Anna Mellizo Kroll, Anna Broerman"
-date: "2025-03-19"
+date: "2025-04-04"
 output: html_document
 editor_options: 
   chunk_output_type: console
@@ -9,35 +9,45 @@ editor_options:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-#install.packages("reshape")
-library(reshape)
+library(IRanges)
+library(dplyr)
 library(tidyr)
 library(tibble)
+library(readr)
 library(ggplot2)
-library(dplyr)
-
+library(purrr)
+library(magrittr)
+library(pheatmap)
+library(textshape)
+library(Rcpp)
+library(DESeq2)
+library(matrixStats)
+library(knitr)
+library(reshape)
 ```
 
+# Goal: To generate line plots, heat map, and volcano plot of our chosen genes
+
+### Loading in DESeq and TPM results
 ```{r loading in DESeq and TPM results}
 load("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/project_results/counts_DESEQ_results.rdata")
 
 load("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/project_results/TPM_results.Rdata")
 ```
 
-```{r facet all timepoint TPM distributions}
-# First let's make set of time values for faceting:
-time_values <- c("0_avg", "12_avg", "24_avg", "48_avg", "96_avg")
 
-# This can also be done with grep (smarter):
+## Generating line plots for each chosen gene
+```{r facet all timepoint TPM distributions}
+# Making a set of time values with grep:
 time_points <- names(average_and_stddev_values)[grep("avg", names(average_and_stddev_values))]
+
 # moving rows into df so we can track gene_id
 average_and_stddev_values_2 <- rownames_to_column(average_and_stddev_values, var = "gene_id")
 
 # Melt the data frame to long format
 melt_tpm_df <- melt(average_and_stddev_values_2, measure.vars = time_points, value_name = "gene_id")
 
-# Cool we just made it a really long df (compare original and melt) -it's 5x longer
-# Note the same can be done with pivot longer
+# Pivot longer df (not necessary but another format)
 pivot_longer_tpm_df <- average_and_stddev_values_2 %>% 
   pivot_longer(cols = all_of(time_points), names_to = 'Time', values_to = 'TPM')
 
@@ -48,14 +58,13 @@ sig_genes <- as.data.frame(unique(filtered_res_df$gene_id))
 
 names(sig_genes) <- "gene_id"
 
-# one way to subset the data frame of avrg / sd TPM values
+# Subsetting the data frame of avrg / sd TPM values
 sig_gene_tpm <- inner_join(average_and_stddev_values_2, sig_genes, by = "gene_id")
 
-
-# let's now merge in the gene names into this handy dataframe
+# Merging the gene names into dataframe
 sig_gene_tpm <- merge(sig_gene_tpm, g2s)
 
-# Now we should organize so we can plot specific genes (not mix character and integer)
+# organizing to plot specific genes (not mix character and integer)
 sig_gene_tpm <- sig_gene_tpm %>%
   select(-gene_id) 
 ```
@@ -72,26 +81,23 @@ top_indices <- order(sorted_df$change, decreasing = TRUE)[1:5]
 # Retrieve the top 5 values with the gene name (11th column), change, 4th column, and 2nd column
 top_genes <- sorted_df[top_indices, c(11, which(colnames(sorted_df) == "change"), 4, 2)]
 ```
-#ENSMUSG00000064357.1 is mt-Atp6
-#ENSMUSG00000000031.16 is H19
-#ENSMUSG00000050621.7 is Rps27rt
 
-#Plotting all three gene line plots together: 
-```{r plotting}
-# (1) set of genes of interest or list.
+### Plotting all three chosen genes in line plots together 
+```{r all 3 genes together plotting}
+# Our genes of interest
 genes_of_interest <- data.frame(gene = c("ENSMUSG00000064357.1", "ENSMUSG00000000031.16", "ENSMUSG00000050621.7"))
 
-# (2) Reduce TPM file to these genes
+# Reducing the TPM file to these genes 
 df_plot_genes <- TPM_filtered[rownames(TPM_filtered) %in% genes_of_interest$gene, ]
 
 # Moving rownames in to a column
 df_plot_genes <- rownames_to_column(df_plot_genes, var = "gene_id")
 
-# (3) Pivot longer (watch the changes !)
+# Pivot longer
 df_plot_genes <- df_plot_genes %>% 
   pivot_longer(cols = -gene_id, names_to = 'Time_Replicate', values_to = 'TPM')
 
-# Seperating sample name into time and replicate for plotting table
+# Separating sample name into time and replicating for plotting table
 df_plot_genes <- df_plot_genes %>%
   separate(
     Time_Replicate,
@@ -101,34 +107,34 @@ df_plot_genes <- df_plot_genes %>%
   ) %>%
   select(-WT)
 
-# Convert Time to numeric values
+# Converting time to numeric values 
 df_plot_genes$Time <- as.numeric(df_plot_genes$Time)
 
-# (4) Group by Time and calculate mean and std of TPM
+# Group by time, calculate mean and std of TPM
 df_plot_genes <- df_plot_genes %>% 
   group_by(gene_id, Time) %>% 
   summarise(mean_TPM = mean(TPM), sd_TPM = sd(TPM))
 
-# (1) Create a named vector for gene ID to gene name mapping
+# Creating a named vector for gene ID to gene name mapping
 gene_labels <- c(
   "ENSMUSG00000064357.1" = "mt-Atp6",
   "ENSMUSG00000000031.16" = "H19",
   "ENSMUSG00000050621.7" = "Rps27rt"
 )
 
-# (2) Modify the plot to use these names in facet_wrap
+# Modify the plot to use these names in facet_wrap
 ggplot(df_plot_genes, aes(x = Time, y = mean_TPM)) +
   geom_line() +
   geom_errorbar(aes(ymin = mean_TPM - sd_TPM, ymax = mean_TPM + sd_TPM), width = 0.2) +
   labs(x = 'Time (hours)', y = 'Average TPM') +
   ggtitle('Average TPM Across All Time Points') +
   facet_wrap(~ gene_id, scales = "free_y", labeller = labeller(gene_id = gene_labels))
-
 ```
+These plots show the transcripts per million (TPM) of our genes of interest over time. These three specific genes yield interesting results as they show the most change in TPM in comparison with other genes, suggesting that doxycycline has a large effect on their expression. The Rps27rt and mt-Atp6 gene show significant increases between hours 0 and 12, while all three show further increases between hours 12 and 24. After about 48 hours, all three show decreases in TPM, but none decrease back to baseline TPM values.
 
-#Plotting gene Rps27rt as a line plot:  
-```{r plotting}
-# Picking a favorite gene
+### Plotting gene Rps27rt as a line plot:  
+```{r Rps27rt plotting}
+# Picking Rps27rt
 gene_up <- as.data.frame(c("Rps27rt"))
 
 names(gene_up) <- "gene_name"
@@ -136,38 +142,38 @@ names(gene_up) <- "gene_name"
 # indexing to just get values for this gene
 Rps27rt_tpm <- sig_gene_tpm[sig_gene_tpm$gene_name %in% gene_up$gene_name, ]
 
-# now moving the character gene_name to rownames to won't interfere with numeric values
+# Moving the character gene_name to rownames so it won't interfere with numeric values
 rownames(Rps27rt_tpm) <- Rps27rt_tpm$gene_name
 
 # removing text column
 Rps27rt_tpm <- Rps27rt_tpm %>%
   select(-gene_name) 
-# We now need to futher prepare our data :)
-# Let's get a variable for col names to plot
+
+# Getting a variable for col names to plot
 avg_cols <- grep("_avg", names(Rps27rt_tpm), value = TRUE)
 
 sd_cols <- grep("_sd", names(Rps27rt_tpm), value = TRUE)
 
-# This is another way to "melt" or pivot longer
+# Pivot longer
 plot_df <- data.frame(
   time = as.numeric(gsub("_avg", "", avg_cols)),
   avg = unlist(Rps27rt_tpm[avg_cols]),
   sd = unlist(Rps27rt_tpm[sd_cols])
 )
 
-# NOW THE PLOT !
+# Plotting   
 ggplot(plot_df, aes(x = time, y = avg)) +
   geom_line() +
   geom_errorbar(aes(ymin = avg - sd, ymax = avg + sd), width = 0.2) +
   theme("paperwhite") +
   labs(x = "Time (hours)", y = "TPM Value") +
-  ggtitle('Gene Rps27rt Across Time')
+  ggtitle('Gene Rps27rt TPM value over Time')
+
 ```  
   
-
-#Plotting gene mt-Atp6 as a line plot:  
-```{r plotting}
-# Picking a favorite gene
+### Plotting gene mt-Atp6 as a line plot:  
+```{r mt-Atp6 plotting}
+# Picking mt-Atp6 gene
 gene_up <- as.data.frame(c("mt-Atp6"))
 
 names(gene_up) <- "gene_name"
@@ -175,26 +181,26 @@ names(gene_up) <- "gene_name"
 # indexing to just get values for this gene
 mtAtp6_tpm <- sig_gene_tpm[sig_gene_tpm$gene_name %in% gene_up$gene_name, ]
 
-# now moving the character gene_name to rownames to won't interfere with numeric values
+# moving the character gene_name to rownames so it won't interfere with numeric values
 rownames(mtAtp6_tpm) <- mtAtp6_tpm$gene_name
 
 # removing text column
 mtAtp6_tpm <- mtAtp6_tpm %>%
   select(-gene_name) 
-# We now need to futher prepare our data :)
-# Let's get a variable for col names to plot
+
+# Getting a variable for col names to plot
 avg_cols <- grep("_avg", names(mtAtp6_tpm), value = TRUE)
 
 sd_cols <- grep("_sd", names(mtAtp6_tpm), value = TRUE)
 
-# This is another way to "melt" or pivot longer
+# Another way to "melt" or pivot longer
 plot_df <- data.frame(
   time = as.numeric(gsub("_avg", "", avg_cols)),
   avg = unlist(mtAtp6_tpm[avg_cols]),
   sd = unlist(mtAtp6_tpm[sd_cols])
 )
 
-# NOW THE PLOT !
+# Plotting
 ggplot(plot_df, aes(x = time, y = avg)) +
   geom_line() +
   geom_errorbar(aes(ymin = avg - sd, ymax = avg + sd), width = 0.2) +
@@ -202,10 +208,9 @@ ggplot(plot_df, aes(x = time, y = avg)) +
   labs(x = "Time (hours)", y = "TPM Value") +
   ggtitle('Gene mt-Atp6 Across Time')
 ```  
-  
-  
-#Plotting gene H19 as a line plot:  
-```{r plotting}
+
+### Plotting gene H19 as a line plot:  
+```{r H19 plotting}
 # Picking a favorite gene
 gene_up <- as.data.frame(c("H19"))
 
@@ -214,26 +219,26 @@ names(gene_up) <- "gene_name"
 # indexing to just get values for this gene
 H19_tpm <- sig_gene_tpm[sig_gene_tpm$gene_name %in% gene_up$gene_name, ]
 
-# now moving the character gene_name to rownames to won't interfere with numeric values
+# now moving the character gene_name to rownames so it won't interfere with numeric values
 rownames(H19_tpm) <- H19_tpm$gene_name
 
 # removing text column
 H19_tpm <- H19_tpm %>%
   select(-gene_name) 
-# We now need to futher prepare our data :)
-# Let's get a variable for col names to plot
+
+# Getting a variable for col names to plot
 avg_cols <- grep("_avg", names(H19_tpm), value = TRUE)
 
 sd_cols <- grep("_sd", names(H19_tpm), value = TRUE)
 
-# This is another way to "melt" or pivot longer
+# Another way to "melt" or pivot longer
 plot_df <- data.frame(
   time = as.numeric(gsub("_avg", "", avg_cols)),
   avg = unlist(H19_tpm[avg_cols]),
   sd = unlist(H19_tpm[sd_cols])
 )
 
-# NOW THE PLOT !
+# Plotting
 ggplot(plot_df, aes(x = time, y = avg)) +
   geom_line() +
   geom_errorbar(aes(ymin = avg - sd, ymax = avg + sd), width = 0.2) +
@@ -242,9 +247,8 @@ ggplot(plot_df, aes(x = time, y = avg)) +
   ggtitle('Gene H19 Across Time')
   
 ```
-#Volcano plot 
 
-?ggplot
+## Creating a volcano plot of the chosen genes 
 ```{r volcano plot}
 highlighted_genes <- c("H19", "Rps27rt", "mtAtp6")
 
@@ -259,6 +263,74 @@ ggplot(filtered_res_df, aes(x = log2FoldChange, y = -log10(padj), color = color_
   scale_color_manual(values = c("Genes of Interest" = "red", "Other" = "black")) +  # Set colors
   labs(x = "Log2 Fold Change", y = "-log10(Adjusted P-value)", title = "Volcano Plot of Significant Genes") +
   theme_minimal()
+
 ```
   
-  
+## Creating a heatmap of the chosen genes
+```{r distance calculation}
+
+# Log-transform the TPM values. 
+log_tpm_matrix <- log2(TPM_filtered + 1)
+
+# euclidean distance / similarity based on log2 TPM values of genes in TPM_filtered.
+distance_matrix <- dist(t(log_tpm_matrix), method = "euclidean")
+
+hc_complete <- hclust(distance_matrix, method = "complete")
+
+# use plot() to plot the distance calucalated in hclust
+plot(hc_complete, labels = colnames(log_tpm_matrix), main = "Global TPM Filtered Dendrogram ", sub = "sample relationship by time and replicate after dox treatment")
+
+# Cut tree to limit the clusters 
+clusters <- cutree(hc_complete, k = 5)
+```
+
+```{r ordered dendrogram}
+# Making a dendrogram of hc_complete
+dend_hc_complete <- as.dendrogram(hc_complete)
+
+# Reorder the dendrogram based on the clusters created above
+dend_hc_complete <- reorder(dend_hc_complete, clusters)
+
+# Plot the reordered dendrogram
+plot(dend_hc_complete, main = "Global TPM Filtered Dendrogram (Ordered by Cluster)", sub = "Sample relationship by time and replicate after dox treatment")
+```
+
+```{r Create Heat map of all filtered TPM genes across all time points and replicates}
+# Mapping gene IDs to gene names
+gene_labels <- c(
+  "ENSMUSG00000064357.1" = "mt-Atp6",
+  "ENSMUSG00000000031.16" = "H19",
+  "ENSMUSG00000050621.7" = "Rps27rt"
+)
+
+# Subset the log_tpm_matrix to include only the genes of interest using their gene IDs
+log_tpm_subset <- log_tpm_matrix[rownames(log_tpm_matrix) %in% names(gene_labels), ]
+
+# Rename row names to gene names using gene_labels
+rownames(log_tpm_subset) <- gene_labels[rownames(log_tpm_subset)]
+
+
+custom_dist <- function(x) dist(x, method = "manhattan") # Replace "manhattan" with your preferred method
+custom_hclust <- function(x) hclus
+
+
+# Create the heatmap with the subset of genes for the time points
+deseq_samples$time_point <- factor(deseq_samples$time_point, levels = c("0", "12", "24", "48", "96"))
+
+# reorder the deseq samples in sequential order
+deseq_samples <- deseq_samples[order(deseq_samples$time_point), ]
+
+# Reorders the tpm based on the new order
+log_tpm_subset_ordered <- log_tpm_subset[, deseq_samples$sample_id]
+
+# Generate the heatmap
+pheatmap(log_tpm_subset_ordered, 
+         cluster_rows = TRUE,  
+         cluster_cols = FALSE,  # Disable clustering for columns to preserve order
+         scale = "row",        
+         show_rownames = TRUE, 
+         show_colnames = TRUE,  
+         main = "Heatmap of Log2-Transformed TPM Values for Selected Genes",
+         color = colorRampPalette(c("blue", "white", "red"))(50))
+
+```

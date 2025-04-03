@@ -41,6 +41,7 @@ any(rowSums(TPM_filtered) < 1)
 any(rowSums(TPM) < 1)
 
 ```
+
 # Calculating the replicate mean and standard deviation for each gene in each time point
 ```{r making table of mean and sd TPM value for each gene for each time point}
 
