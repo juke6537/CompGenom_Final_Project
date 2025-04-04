@@ -25,6 +25,7 @@ library(matrixStats)
 library(knitr)
 ```
 
+
 # Import TPM file from Salmon after DESeq
 ```{r import counts and TPM from Salmon}
 # loading and preparing TPM file from Salmon
