@@ -16,7 +16,7 @@ library(ggplot2)
 library(dplyr)
 library(pheatmap)
 library(readr)
-
+library(tidyverse)
 ```
 
 # Goal create "heatmaps"to represent gene abundance across time and replicates.
@@ -69,16 +69,13 @@ distance_matrix <- dist(t(log_tpm_matrix), method = "euclidean")
 # Downside of ward is it assumes a circle relationship where as complete is linear - like we have with time.
 hc_complete <- hclust(distance_matrix, method = "complete")
 
-# Now we can use plot() to plot the distance calucalated in hclust!
+# Now we can use plot() to plot the distance calculated in hclust
 plot(hc_complete, labels = colnames(log_tpm_matrix), main = "Global TPM Filtered Dendrogram ", sub = "sample relationship by time and replicate after dox treatment")
 # Cool we see that samples see to return closer to 0 after 96 hours of dox treatment
 # Also that the replicates are more similar than time points - a very good / expected thing 
 
 # Cut tree to limit the clusters 
 clusters <- cutree(hc_complete, k = 5)
-# Print out which sample is in which cluster
-print(clusters)
-# Cool we can see each time point is represented in each cluster !
 ```
 
 ```{r ordered dendrogram}
@@ -111,15 +108,29 @@ log_tpm_subset <- log_tpm_matrix[rownames(log_tpm_matrix) %in% names(gene_labels
 # Rename row names to gene names using gene_labels
 rownames(log_tpm_subset) <- gene_labels[rownames(log_tpm_subset)]
 
+
+custom_dist <- function(x) dist(x, method = "manhattan") # Replace "manhattan" with your preferred method
+custom_hclust <- function(x) hclus
+
+
 # Create the heatmap with the subset of genes
-pheatmap(log_tpm_subset, 
-         cluster_rows = TRUE,  # Cluster genes (rows)
-         cluster_cols = TRUE,  # Cluster samples (columns)
-         scale = "row",        # Scale the data across rows (genes) for better visualization
-         show_rownames = TRUE, # Show gene names for the selected genes
-         show_colnames = TRUE, # Show sample names
+deseq_samples$time_point <- factor(deseq_samples$time_point, levels = c("0", "12", "24", "48", "96"))
+
+# Reorder deseq_samples by time_point
+deseq_samples <- deseq_samples[order(deseq_samples$time_point), ]
+
+# Reorder the TPM matrix columns based on the new sample order
+log_tpm_subset_ordered <- log_tpm_subset[, deseq_samples$sample_id]
+
+# Generate the heatmap
+pheatmap(log_tpm_subset_ordered, 
+         cluster_rows = TRUE,  
+         cluster_cols = FALSE,  # Disable clustering for columns to preserve order
+         scale = "row",        
+         show_rownames = TRUE, 
+         show_colnames = TRUE,  
          main = "Heatmap of Log2-Transformed TPM Values for Selected Genes",
-         color = colorRampPalette(c("blue", "white", "red"))(50),
-         distfun = custom_dist,   
-         hclustfun = custom_hclust)
+         color = colorRampPalette(c("blue", "white", "red"))(50))
+
 ```
+
