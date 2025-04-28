@@ -1,0 +1,78 @@
+---
+title: "Final CGL Project"
+author: "Connor Gagen, Julia Keefe, Paloma Peters, Anna Mellizo Kroll, Anna Broerman"
+date: "2025-04-25"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+source("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/util/00_our_first_function_lesson.R")
+library(GenomicRanges)
+library(IRanges)
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(readr)
+library(ggplot2)
+library(purrr)
+library(magrittr)
+library(pheatmap)
+library(textshape)
+library(Rcpp)
+library(DESeq2)
+library(stringr)
+library(knitr)
+```
+
+###Overall Objective: To compare RNASeq data to ATACSeq data and determine if dox has an effect on human and mouse genomic expression
+
+The goal of this project was to compare the epigenetic and transcriptional responses to doxycycline (dox) treatment in both human and mouse cells. We used two complementary approaches: ATACSeq to assess changes in chromatin accessibility, and RNASeq to identify changes in gene expression. Specifically, we aimed to determine whether dox induces conserved regulatory responses across species, and whether any observed transcriptional changes correspond to changes in chromatin accessibility near key genes.
+
+We first fouund the significant genes that change in response to dox for mouse: 
+
+```{r sig genes image, echo=FALSE, fig.cap="List of Significant Genes"}
+include_graphics("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/Figures/genes.png")
+
+```
+Then we repeated this process for human genes:
+
+#### INSERT HERE
+
+Next, analyzed the ATACSeq data for the mouse data, then the human data. Neither showed any epigentic changes in response to doxycycline. 
+
+# Use DESeq2 to find out if ATAseq peaks are changing in dox and non-dox conditions for both mouse and human
+
+```{r histograms, echo=FALSE, fig.cap="Histograms"}
+include_graphics("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/Figures/atacpeakmouse.png")
+```
+##insert human plot here
+
+As shown by these two plots, there are no statistically significant changes for both the mouse and human response to dox.
+
+### Objective: To look at the 27 genes that overlap between human and mouse data from the RNASeq analysis
+
+We got these 27 genes from another group in our class. These genes are the overlaps between the significant genes from the RNASeq data for both human and mouse
+
+```{r 27 sig genes image, echo=FALSE, fig.cap="The 27 Overlapping Genes"}
+include_graphics("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/Figures/27genes.png")
+```
+
+Of the 27 genes 8 were found on IGV. We looked at the common peaks ATACSeq data for those 8 genes and compared the IGV results for both the human and mouse data
+
+```{r IGV image, echo=FALSE, fig.cap="IGV results"}
+include_graphics("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/Figures/table1.png")
+include_graphics("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/Figures/table2.png")
+include_graphics("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/Figures/table3.png")
+include_graphics("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/lessons/06_Differential_expression_analyses/project/Figures/table4.png")
+
+```
+### Conclusion
+
+In this project, we investigated the effects of doxycycline (dox) treatment on chromatin accessibility and gene expression in both human and mouse cells by integrating ATACSeq and RNASeq data. DESeq2 analysis of the ATACSeq data revealed no statistically significant changes in chromatin accessibility in response to dox treatment in either species, suggesting that dox does not induce detectable epigenetic remodeling at the level of open chromatin.
+
+In contrast, RNASeq analysis identified a substantial number of differentially expressed genes in response to dox. From this, 27 genes were found to be significantly differentially expressed in both mouse and human datasets, indicating a potentially conserved transcriptional response to treatment. To explore whether these shared transcriptional changes were linked to shared regulatory changes, we examined ATACSeq peaks near these 27 genes using IGV. Of the 27 genes, 8 had interpretable ATAC peaks in both species. However, none of the peaks near these genes were statistically significant, and no common accessible regions were observed between human and mouse.
+
+Overall, these findings suggest that while doxycycline induces similar transcriptional responses across species, these changes are not accompanied by detectable alterations in chromatin accessibility. Furthermore, the lack of conserved accessible regions highlights the complexity of regulatory mechanisms across species and suggests that different regulatory architectures can drive similar gene expression outcomes.

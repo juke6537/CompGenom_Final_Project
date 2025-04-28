@@ -1,6 +1,6 @@
 ---
-title: "06_knitting_ATAC_analyses"
-author: "JR"
+title: "Project Part 2"
+author: "Connor Gagen, Julia Keefe, Paloma Peters, Anna Mellizo Kroll, Anna Broerman"
 date: "2024-11-30"
 output: html_document
 editor_options: 
@@ -224,7 +224,7 @@ top30_atac_genes <- atac_lfc_condition %>%
   slice_head(n = 30)                                    
 
 # Print gene names and stats
-top20_atac_genes %>%
+top30_atac_genes %>%
   select(Gene.Name, log2FoldChange, padj, interval_id)
 
 

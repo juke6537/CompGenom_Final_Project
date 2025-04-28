@@ -1,0 +1,43 @@
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+source("/scratch/Shares/rinnclass/MASTER_CLASS/STUDENTS/juke6537/MASTER_CLASS/util/00_our_first_function_lesson.R")
+library(GenomicRanges)
+library(IRanges)
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(readr)
+library(ggplot2)
+library(purrr)
+library(magrittr)
+library(pheatmap)
+library(textshape)
+library(Rcpp)
+library(DESeq2)
+library(stringr)
+```
+
+```{r create my_peaks GRange List using import_peaks custom function}
+
+# peak file "consensus_path" parameter of import_peaks function
+peak_path <- "<your_atac_pipeline_output_dir>/bwa/merged_library/macs2/broad_peak"
+peak_path <- "/scratch/Shares/rinnclass/MASTER_CLASS/lessons/08_ATACseq_pipeline/00_run_pipeline/00_pipeline_run/pipeline_run/bwa/merged_library/macs2/broad_peak"
+
+# make file list (fl)
+fl <- list.files(peak_path, full.names = TRUE, pattern = ".broadPeak")
+
+# import peaks !
+my_peaks <- import_peaks(consensus_file_path = peak_path)
+
+# test common_peaks function 
+common_peaks <- find_common_peaks(my_peaks)
+
+# make a list of gene_promoters and common_peaks
+gr_list_genes <- list(sample1 = common_peaks, sample2 = gene_promoters)
+# find common overlaps
+all_gene_common_ov <- find_common_peaks(gr_list_genes)
+
+rtracklayer::export(all_gene_common_ov, con = "project_results/gene_common_ov.bed", format = "BED")
+
+
+```
